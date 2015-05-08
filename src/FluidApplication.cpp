@@ -24,5 +24,4 @@ const string fragment =
 void FluidApplication::init()
 {
     program.reset(new ShaderProgram(vertex,fragment));
-    cout << flush;
 }

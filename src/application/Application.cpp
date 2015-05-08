@@ -30,7 +30,6 @@ void Application::exec()
     loadOpenGLContext();
 
     this->init();
-    throw 0;
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(main_loop, 30, true);
 #else

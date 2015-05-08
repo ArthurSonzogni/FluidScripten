@@ -5,12 +5,12 @@ using namespace std;
 
 ShaderProgram::ShaderProgram(const std::string& vertex, const std::string& fragment)
 {
-    cout << "loading vertex shader" << endl;
+    cout << "[Compilation] vertex shader ..." << endl;
     vert = loadShader(GL_VERTEX_SHADER,vertex); 
-    cout << "loading fragment shader" << endl;
+    cout << "[Compilation] fragment shader ..." << endl;
     frag = loadShader(GL_FRAGMENT_SHADER,fragment);
-
-    cout << vert << "," << frag << endl;
+    cout << "[Link] linking ..." << endl;
+    link();
 }
 
 ShaderProgram::~ShaderProgram()
@@ -43,7 +43,10 @@ GLuint ShaderProgram::loadShader(GLenum type, const std::string& source)
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
         if (length > 1)
         {
-            string info(length,' '); 
+            string info(length,' ');
+            glGetShaderInfoLog(id, length, NULL, &info[0]);
+            cout << "Error link a program : " << endl;
+            cout << info << endl;
         }
         glDeleteShader(id);
         return 0;
@@ -51,3 +54,28 @@ GLuint ShaderProgram::loadShader(GLenum type, const std::string& source)
     else return id;
 }
 
+void ShaderProgram::link()
+{
+    id = glCreateProgram();
+    glAttachShader(id, vert);
+    glAttachShader(id, frag);
+    glLinkProgram(id);
+
+    // Check the link status
+    GLint is_linked = false;
+    glGetProgramiv(id, GL_LINK_STATUS, &is_linked);
+    if(!is_linked) 
+    {
+        GLint length = 0;
+        glGetProgramiv(id, GL_INFO_LOG_LENGTH, &length);
+        if(length > 1)
+        {
+            string info(length,' ');
+            glGetProgramInfoLog(id, length, NULL, &info[0]);
+            cout << "Error link a program : " << endl;
+            cout << info << endl;
+        }
+        glDeleteProgram(id);
+        id = 0;
+    }
+}
