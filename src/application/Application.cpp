@@ -29,6 +29,8 @@ void Application::exec()
     height = 600;
     loadOpenGLContext();
 
+    this->init();
+    throw 0;
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(main_loop, 30, true);
 #else
@@ -68,4 +70,8 @@ void Application::step()
 {
     static int step_counter = 0;
     cout << "Step = " << step_counter++ << endl;
+}
+
+void Application::init()
+{
 }

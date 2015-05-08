@@ -1,11 +1,16 @@
 #include "ShaderProgram.hpp"
+#include <iostream>
 
 using namespace std;
 
 ShaderProgram::ShaderProgram(const std::string& vertex, const std::string& fragment)
 {
-   vert = loadShader(GL_VERTEX_SHADER,vertex); 
-   frag = loadShader(GL_FRAGMENT_SHADER,fragment);
+    cout << "loading vertex shader" << endl;
+    vert = loadShader(GL_VERTEX_SHADER,vertex); 
+    cout << "loading fragment shader" << endl;
+    frag = loadShader(GL_FRAGMENT_SHADER,fragment);
+
+    cout << vert << "," << frag << endl;
 }
 
 ShaderProgram::~ShaderProgram()
@@ -25,7 +30,7 @@ GLuint ShaderProgram::loadShader(GLenum type, const std::string& source)
     const char* d = source.data();
     const char** dd = &d;
     glShaderSource(id, 1, dd, NULL);
-    
+
     // compile the shader
     glCompileShader(id);
     GLint isCompiled = false;
@@ -45,4 +50,4 @@ GLuint ShaderProgram::loadShader(GLenum type, const std::string& source)
     }
     else return id;
 }
-    
+

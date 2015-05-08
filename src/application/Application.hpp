@@ -9,6 +9,7 @@ class Application
     public:
         void exec();
         virtual void step();
+        virtual void init();
     private:
         void loadOpenGLContext();
     private: // data

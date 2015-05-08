@@ -1,9 +1,9 @@
 #include "graphics/ShaderProgram.hpp"
-#include "application/Application.hpp"
+#include "FluidApplication.hpp"
 
 int main(int argc, char* argv[])
 {
-    Application app;
+    FluidApplication app;
     app.exec();
 }
 
