@@ -31,7 +31,7 @@ void Application::exec()
 
     this->init();
 #ifdef EMSCRIPTEN
-    emscripten_set_main_loop(main_loop, 30, true);
+    emscripten_set_main_loop(main_loop, 0, true);
 #else
     while (!done) {
         em_arg_callback_func();

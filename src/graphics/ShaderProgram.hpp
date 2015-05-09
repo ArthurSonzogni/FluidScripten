@@ -12,6 +12,7 @@ class ShaderProgram
     public:
         ShaderProgram(const std::string& vertex, const std::string& fragment);
         ~ShaderProgram();
+        GLuint data() { return id; }
     private:
         GLuint loadShader(GLenum type, const std::string& source);
         GLuint vert;
