@@ -5,6 +5,7 @@
 #include "graphics/ShaderProgram.hpp"
 #include <memory>
 #include <vector>
+#include "simulation/Simulation.hpp"
 
 class FluidApplication : public Application
 {
