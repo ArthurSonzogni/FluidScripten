@@ -18,11 +18,11 @@ class FluidApplication : public Application
         GLuint texture_id = 0;
         GLint  texture_uniform_id = 0;
 
-        std::vector<uint8_t> intensity;
+        static const int N = 128;
+        Simulation<N> simulation;
+        std::vector<uint8_t> intensity = std::vector<uint8_t>(N*N,128);
         void buildTexture();
         void updateTexture();
-        int width = 512;
-        int height = 512;
 };
 
 #endif /* end of include guard: FLUIDAPPLICATION_H */

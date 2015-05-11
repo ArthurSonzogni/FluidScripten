@@ -10,16 +10,25 @@ class Simulation
     public:
         typedef std::vector<float> D;
         // the data
-        D source    = D(N*N,0.f);
         D density   = D(N*N,0.f);
         D velocityX = D(N*N,0.f);
         D velocityY = D(N*N,0.f);
+        // the source
+        D sourceDensity      = D(N*N,0.f);
+        D sourceVelocityX    = D(N*N,0.f);
+        D sourceVelocityY    = D(N*N,0.f);
+        // the parameters
         float dt = 1.0f;
-        float diffusion = 1.0f;
+        float diffusion = 0.01f;
+        float viscosity = 0.01f;
+        // the method
+        void evolve();
     private:
-        void evolve_density(float dt);
+        void evolve_density();
+        void evolve_velocity();
         // internal data
-        D buffer = D(N*N,0.0f);
+        D buffer_1 = D(N*N,0.0f);
+        D buffer_2 = D(N*N,0.0f);
     private:
         // utilities
         static inline int P(int x, int y) { return x + N * y ;}
@@ -27,6 +36,7 @@ class Simulation
         static void diffuse(const D& input, D& output, float dt);
         static void advect(const D& input, D& output, const D& dx, const D& dy, float dt);
         static void add_source(const D& source, D& output, float dt);
+        static void project(D& dx, D& dy, D& pressure, D& divergence);
 
 };
 

@@ -11,21 +11,20 @@ template<int N>
 void Simulation<N>::diffuse(const D& input, D& output, float dt)
 {
     float a = dt;
-    float A = a / ( 1.0f + 4.0f * a);
     for (int k=0 ; k<20 ; k++ )
     {
         for (int y=1 ; y<N-1 ; y++ )
         for (int x=1 ; x<N-1 ; x++ )
         { 
             output[P(x,y)] = (
-                                    input[P(x,y)] + A *
+                                    input[P(x,y)] + a * 
                                     (
                                         output[P(x-1 , y   )] +
                                         output[P(x+1 , y   )] +
                                         output[P(x   , y-1 )] +
                                         output[P(x   , y+1 )]
                                     )
-                             );
+                             ) / ( 1.0f + 4.0f * a );
         }
         set_boundary( output, 0.f);
     }
@@ -55,8 +54,8 @@ void Simulation<N>::advect(const D& input, D& output, const D& dx, const D& dy, 
         const float lx = X-X0;
         const float ly = Y-Y0;
 
-        output[P(x,y)] = lx * ( ly * input[P(X0,Y0)] + (1.0f - ly) * input[P(X0,Y0)] ) +
-                   (1.0f-lx) * ( ly * input[P(X0,Y0)] + (1.0f - ly) * input[P(X0,Y0)] ) ;
+        output[P(x,y)] = (1.0-lx) *  ( (1.0f-ly) * input[P(X0,Y0)] + ly * input[P(X0,Y1)] ) +
+                              lx   * ( (1.0f-ly) * input[P(X1,Y0)] + ly * input[P(X1,Y1)] ) ;
     }
 } 
 
@@ -69,9 +68,74 @@ void Simulation<N>::add_source(const D& source, D& output, float dt)
 
 
 template<int N>
-void Simulation<N>::evolve_density(float dt)
+void Simulation<N>::evolve_density()
 {
-    add_source(source, density, dt);
-    diffuse(density,buffer,dt*diffusion);
-    advect(buffer,density,velocityX,velocityY,dt);
+    add_source(sourceDensity, density, dt);
+    diffuse(density,buffer_1,dt*diffusion);
+    advect(buffer_1,density,velocityX,velocityY,dt);
+}
+
+template<int N>
+void Simulation<N>::evolve_velocity()
+{
+    add_source(sourceVelocityX,velocityX,dt); 
+    add_source(sourceVelocityY,velocityY,dt); 
+
+    diffuse(velocityX,buffer_1,dt*viscosity);
+    diffuse(velocityY,buffer_2,dt*viscosity);
+
+    project(buffer_1,buffer_2,velocityX,velocityY);
+
+    advect(buffer_1, velocityX, buffer_1, buffer_2, dt);
+    advect(buffer_2, velocityY, buffer_1, buffer_2, dt);
+
+    project(velocityX, velocityY, buffer_1,buffer_2);
+}
+
+template<int N>
+void Simulation<N>::project(D& dx, D& dy, D& pressure, D& divergence)
+{
+    // compute divergence
+    for (int y=1 ; y<N-1 ; y++ )
+    for (int x=1 ; x<N-1 ; x++ )
+    {
+        divergence[P(x,y)] = - 0.5f *
+        (
+                dx[P(x+1 , y  )] - dx[P(x-1 , y  )] +
+                dy[P(x   , y+1)] - dy[P(x   , y-1)]
+        );
+    }
+    set_boundary(divergence,0.0f);
+
+    // compute pressure
+    for(int i = 0; i<N*N; ++i) pressure[i] = 0.0f;
+    for (int k=0 ; k<20 ; k++ )
+    {
+        for (int y=1 ; y<N-1 ; y++ )
+        for (int x=1 ; x<N-1 ; x++ )
+        { 
+            pressure[P(x,y)] = 0.25f * (
+              divergence[P(x  ,y  )] + 
+                pressure[P(x-1,y  )] +
+                pressure[P(x+1,y  )] +
+                pressure[P(x  ,y-1)] +
+                pressure[P(x  ,y+1)] );
+        }
+    }
+
+    // compute projected field
+    for (int y=1 ; y<N-1 ; y++ )
+    for (int x=1 ; x<N-1 ; x++ )
+        dx[P(x,y)] -= 0.5f * ( pressure[P(x+1,y  )] - pressure[P(x-1,y  )] );
+
+    for (int y=1 ; y<N-1 ; y++ )
+    for (int x=1 ; x<N-1 ; x++ )
+        dy[P(x,y)] -= 0.5f * ( pressure[P(x  ,y+1)] - pressure[P(x  ,y-1)] );
+}
+
+template<int N>
+void Simulation<N>::evolve()
+{
+    evolve_density();
+    evolve_velocity();
 }

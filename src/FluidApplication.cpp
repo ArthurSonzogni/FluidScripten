@@ -23,16 +23,39 @@ const string fragment =
 R"(
 varying vec2 fPos;
 uniform sampler2D intensity;
+//! FRAGMENT
+vec3 rainbow(float x)
+{
+    /*
+        Target colors
+        =============
+        
+        L  x   color
+        0  0.0 vec4(1.0, 0.0, 0.0, 1.0);
+        1  0.2 vec4(1.0, 0.5, 0.0, 1.0);
+        2  0.4 vec4(1.0, 1.0, 0.0, 1.0);
+        3  0.6 vec4(0.0, 0.5, 0.0, 1.0);
+        4  0.8 vec4(0.0, 0.0, 1.0, 1.0);
+        5  1.0 vec4(0.5, 0.0, 0.5, 1.0);
+    */
+    
+    float level = floor(x * 6.0);
+    float r = float(level <= 2.0) + float(level > 4.0) * 0.5;
+    float g = max(1.0 - abs(level - 2.0) * 0.5, 0.0);
+    float b = (1.0 - (level - 4.0) * 0.5) * float(level >= 4.0);
+    return vec3(r, g, b);
+}
+
 void main()                                
 {                                          
     float d = texture2D(intensity,fPos).r;
-    gl_FragColor = vec4(d,d,d,1.0);
+    gl_FragColor = vec4(rainbow(d)*min(1.0,d*10.0),1.0);
 }                                          
 )";
 
 void FluidApplication::init()
 {
-    intensity.resize(width*height,128);
+    intensity.resize(N*N,128);
 
     // load shader
     program.reset(new ShaderProgram(vertex,fragment));
@@ -59,6 +82,38 @@ void FluidApplication::init()
 
 void FluidApplication::step()
 {
+    // simulate 1 step
+    static int i = 0;
+    ++i;
+    for(int dx = -2; dx<2; ++dx)
+    for(int dy = -2; dy<2; ++dy)
+    {
+        simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (25.0f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*5.f;
+        simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (25.0f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*5.f;
+        simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 400.0f;
+    }
+    for(int y = 0; y<N; ++y)
+    {
+        simulation.sourceVelocityX[1+y*N] = 25.0f;
+        simulation.sourceVelocityY[1+y*N] = 0.0f;
+        simulation.sourceDensity[1+y*N] = (y/10)%2 ? 250.f : 0.0f;
+    }
+
+    simulation.dt = 0.1f;
+    simulation.viscosity = 0.001f;
+    simulation.diffusion = 0.01f;
+    simulation.evolve();
+
+    // update denstity
+    for(int i = 0; i<N*N; ++i)
+    {
+        double dx = simulation.velocityX[i];
+        double dy = simulation.velocityY[i];
+        double d = simulation.density[i];
+        //intensity[i] = 10.0f*(dx*dx+dy*dy);
+        intensity[i] = d;
+    }
+
     updateTexture();
 
     glUseProgram(program->data());
@@ -78,48 +133,14 @@ void FluidApplication::step()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
-    static int i = 0;
-    ++i;
-    for(int64_t y = 0; y<height; ++y)
-    {
-        intensity[width/2 + y * width] = (i&64) ? 0 : 255;
-        intensity[y + y * width] = (i&64) ? 0 : 255;
-        intensity[y + (height-y) * width] = (i&64) ? 0 : 255;
-    }
 
-
-
-    for(int64_t y = 0; y<height; ++y)
-    {
-        for(int64_t x = 0; x<width; ++x)
-        {
-            int64_t i = x + width * y;
-            int64_t j = (x-1+width)%width + width*y;
-            auto& I = intensity[i];
-            auto& J = intensity[j];
-            auto mean = (I + J)/2;
-            int64_t diff = (I - mean) * 1.1;
-            I -= diff;
-            J += diff;
-        }
-        for(int64_t x = 0; x<width; ++x)
-        {
-            int64_t i = width-x + width * y;
-            int64_t j = (width-x-1+width)%width + width*y;
-            auto& I = intensity[i];
-            auto& J = intensity[j];
-            auto diff = (J - I) * 0.1;
-            I -= diff;
-            J += diff;
-        }
-    }
 }
 
 void FluidApplication::buildTexture()
 {
     glGenTextures(1,&texture_id);
     glBindTexture(GL_TEXTURE_2D,texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -129,7 +150,8 @@ void FluidApplication::buildTexture()
 
 void FluidApplication::updateTexture()
 {
+    // send the texture to openGL
     glBindTexture(GL_TEXTURE_2D,texture_id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height ,GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, N, N ,GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
     glBindTexture(GL_TEXTURE_2D,0);
 }
