@@ -46,10 +46,49 @@ vec3 rainbow(float x)
     return vec3(r, g, b);
 }
 
+float colormap_red(float x) {
+    if (x < 0.7) {
+        return 4.0 * x - 1.5;
+    } else {
+        return -4.0 * x + 4.5;
+    }
+}
+
+float colormap_green(float x) {
+    if (x < 0.5) {
+        return 4.0 * x - 0.5;
+    } else {
+        return -4.0 * x + 3.5;
+    }
+}
+
+float colormap_blue(float x) {
+    if (x < 0.3) {
+       return 4.0 * x + 0.5;
+    } else {
+       return -4.0 * x + 2.5;
+    }
+}
+
+vec4 colormap(float x) {
+    float r = clamp(colormap_red(x), 0.0, 1.0);
+    float g = clamp(colormap_green(x), 0.0, 1.0);
+    float b = clamp(colormap_blue(x), 0.0, 1.0);
+    return vec4(r, g, b, 1.0);
+}
+
 void main()                                
 {                                          
+    //float d = texture2D(intensity,fPos).r;
+    //gl_FragColor = vec4(rainbow(d)*min(1.0,d*10.0),1.0);
+    //gl_FragColor = vec4(d,d,d,1.0);
+    //gl_FragColor = colormap(1.0-d);
+
+    float dn = texture2D(intensity,fPos+vec2(0.0,0.005)).r;
     float d = texture2D(intensity,fPos).r;
-    gl_FragColor = vec4(rainbow(d)*min(1.0,d*10.0),1.0);
+    float dp = texture2D(intensity,fPos-vec2(0.0,0.005)).r;
+    float D = 0.5+4.0*(dp-dn);
+    gl_FragColor = vec4(D*d*8.0,D,D,1.0);
 }                                          
 )";
 
@@ -85,23 +124,25 @@ void FluidApplication::step()
     // simulate 1 step
     static int i = 0;
     ++i;
-    for(int dx = -2; dx<2; ++dx)
-    for(int dy = -2; dy<2; ++dy)
+    const int f = 6.0f;
+    for(int dx = -f; dx<f; ++dx)
+    for(int dy = -f; dy<f; ++dy)
     {
-        simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (25.0f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*5.f;
-        simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (25.0f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*5.f;
-        simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 400.0f;
+        if (dx*dx+dy*dy>f*f) continue;
+        simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*10.f;
+        simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*10.f;
+        simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 500.0f;
     }
     for(int y = 0; y<N; ++y)
     {
-        simulation.sourceVelocityX[1+y*N] = 25.0f;
+        simulation.sourceVelocityX[1+y*N] = 400.0f;
         simulation.sourceVelocityY[1+y*N] = 0.0f;
-        simulation.sourceDensity[1+y*N] = (y/10)%2 ? 250.f : 0.0f;
+        simulation.sourceDensity[1+y*N] = (y/5)%2 ? 1700.0f : 0.0f;
     }
 
-    simulation.dt = 0.1f;
-    simulation.viscosity = 0.001f;
-    simulation.diffusion = 0.01f;
+    simulation.dt = 0.05f;
+    simulation.viscosity = 1.0f;
+    simulation.diffusion = 1.0f;
     simulation.evolve();
 
     // update denstity
@@ -111,7 +152,7 @@ void FluidApplication::step()
         double dy = simulation.velocityY[i];
         double d = simulation.density[i];
         //intensity[i] = 10.0f*(dx*dx+dy*dy);
-        intensity[i] = d;
+        intensity[i] = max(0.0,min(d*0.25,255.0));
     }
 
     updateTexture();
