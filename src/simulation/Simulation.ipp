@@ -1,10 +1,37 @@
 template<int N>
+Simulation<N>::Simulation()
+{
+    //for(int y = 0; y<N; ++y)
+    //for(int x = 0; x<N; ++x)
+    //{
+        //int dx = x - N/2;
+        //int dy = y - N/2;
+        //int d = dx*dx+dy*dy-40*40;
+        //if (abs(d) < 20*20 & dx >  -20)
+        //boundary[P(x,y)] = false;
+    //}
+    //for(int y = 0; y<N; ++y)
+    //for(int x = 0; x<N; ++x)
+    //{
+        //if ( ((x)/5)%2 == 0 && ((y)/5)%2 == 0)
+            //boundary[P(x,y)] = false;
+    //}
+}
+    
+template<int N>
 void Simulation<N>::set_boundary(D& data, float value)
 {
     for (int x=0; x<N; x++) data[P(x,0  )] = value;
     for (int x=0; x<N; x++) data[P(x,N-1)] = value;
     for (int y=0; y<N; y++) data[P(0  ,y)] = value;
     for (int y=0; y<N; y++) data[P(N-1,y)] = value;
+}
+
+template<int N>
+void Simulation<N>::multiply_with_boundary(D& data)
+{
+    for(int i = 0; i<N*N; ++i)
+        data[i] *= boundary[i];
 }
 
 template<int N>
@@ -90,11 +117,17 @@ void Simulation<N>::evolve_velocity()
     advect(buffer_2, velocityY, buffer_1, buffer_2, dt);
 
     project(velocityX, velocityY, buffer_1,buffer_2);
+    multiply_with_boundary(velocityX);
+    multiply_with_boundary(velocityY);
+    multiply_with_boundary(density);
 }
 
 template<int N>
 void Simulation<N>::project(D& dx, D& dy, D& pressure, D& divergence)
 {
+
+    multiply_with_boundary(dx);
+    multiply_with_boundary(dy);
     // compute divergence
     for (int y=1 ; y<N-1 ; y++ )
     for (int x=1 ; x<N-1 ; x++ )
@@ -106,6 +139,7 @@ void Simulation<N>::project(D& dx, D& dy, D& pressure, D& divergence)
         );
     }
     set_boundary(divergence,0.0f);
+    multiply_with_boundary(divergence);
 
     // compute pressure
     for(int i = 0; i<N*N; ++i) pressure[i] = 0.0f;

@@ -1,5 +1,6 @@
 #include "FluidApplication.hpp"
 #include <iostream>
+#include <SDL/SDL_mouse.h>
 
 using namespace std;
 
@@ -23,60 +24,6 @@ const string fragment =
 R"(
 varying vec2 fPos;
 uniform sampler2D intensity;
-//! FRAGMENT
-vec3 rainbow(float x)
-{
-    /*
-        Target colors
-        =============
-        
-        L  x   color
-        0  0.0 vec4(1.0, 0.0, 0.0, 1.0);
-        1  0.2 vec4(1.0, 0.5, 0.0, 1.0);
-        2  0.4 vec4(1.0, 1.0, 0.0, 1.0);
-        3  0.6 vec4(0.0, 0.5, 0.0, 1.0);
-        4  0.8 vec4(0.0, 0.0, 1.0, 1.0);
-        5  1.0 vec4(0.5, 0.0, 0.5, 1.0);
-    */
-    
-    float level = floor(x * 6.0);
-    float r = float(level <= 2.0) + float(level > 4.0) * 0.5;
-    float g = max(1.0 - abs(level - 2.0) * 0.5, 0.0);
-    float b = (1.0 - (level - 4.0) * 0.5) * float(level >= 4.0);
-    return vec3(r, g, b);
-}
-
-float colormap_red(float x) {
-    if (x < 0.7) {
-        return 4.0 * x - 1.5;
-    } else {
-        return -4.0 * x + 4.5;
-    }
-}
-
-float colormap_green(float x) {
-    if (x < 0.5) {
-        return 4.0 * x - 0.5;
-    } else {
-        return -4.0 * x + 3.5;
-    }
-}
-
-float colormap_blue(float x) {
-    if (x < 0.3) {
-       return 4.0 * x + 0.5;
-    } else {
-       return -4.0 * x + 2.5;
-    }
-}
-
-vec4 colormap(float x) {
-    float r = clamp(colormap_red(x), 0.0, 1.0);
-    float g = clamp(colormap_green(x), 0.0, 1.0);
-    float b = clamp(colormap_blue(x), 0.0, 1.0);
-    return vec4(r, g, b, 1.0);
-}
-
 void main()                                
 {                                          
     //float d = texture2D(intensity,fPos).r;
@@ -84,11 +31,25 @@ void main()
     //gl_FragColor = vec4(d,d,d,1.0);
     //gl_FragColor = colormap(1.0-d);
 
-    float dn = texture2D(intensity,fPos+vec2(0.0,0.005)).r;
+    float dn = texture2D(intensity,fPos+vec2(0.0,0.008)).r;
     float d = texture2D(intensity,fPos).r;
-    float dp = texture2D(intensity,fPos-vec2(0.0,0.005)).r;
+    float dp = texture2D(intensity,fPos-vec2(0.0,0.008)).r;
     float D = 0.5+4.0*(dp-dn);
     gl_FragColor = vec4(D*d*8.0,D,D,1.0);
+}                                          
+)";
+
+const string fragmentWall =  
+#ifdef EMSCRIPTEN
+"precision mediump float;                   \n"
+#endif
+R"(
+varying vec2 fPos;
+uniform sampler2D intensity;
+void main()                                
+{                                          
+    float d = texture2D(intensity,fPos).r;
+    gl_FragColor = vec4(d,d,d,1.0-d);
 }                                          
 )";
 
@@ -98,6 +59,7 @@ void FluidApplication::init()
 
     // load shader
     program.reset(new ShaderProgram(vertex,fragment));
+    programWall.reset(new ShaderProgram(vertex,fragmentWall));
 
     // load rectangle data
     glGenBuffers(1, &vbo);
@@ -117,64 +79,105 @@ void FluidApplication::init()
 
     // load texture
     buildTexture();
+    buildTextureWall();
+    updateTextureWall();
+
+    // fix opengl state
+    glEnable (GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void FluidApplication::step()
+
+void FluidApplication::simulate()
 {
+    int mouse_x = 0;
+    int mouse_y = 0;
+    if (SDL_GetMouseState(&mouse_x,&mouse_y))
+    {
+        mouse_x = mouse_x * N / width;
+        mouse_y = N-1-mouse_y * N / height;
+        int d = 2;
+        int x_start = max(0,mouse_x-2);
+        int y_start = max(0,mouse_y-2);
+        int x_end   = min(N-1,mouse_x+2);
+        int y_end   = min(N-1,mouse_y+2);
+        for(int x = x_start; x<x_end; ++x)
+        for(int y = y_start; y<y_end; ++y)
+            simulation.boundary[x+N * y] = false;
+        updateTextureWall();
+    }
+
     // simulate 1 step
     static int i = 0;
     ++i;
     const int f = 6.0f;
-    for(int dx = -f; dx<f; ++dx)
-    for(int dy = -f; dy<f; ++dy)
-    {
-        if (dx*dx+dy*dy>f*f) continue;
-        simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*10.f;
-        simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*10.f;
-        simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 500.0f;
-    }
+    //for(int dx = -f; dx<f; ++dx)
+    //for(int dy = -f; dy<f; ++dy)
+    //{
+        //if (dx*dx+dy*dy>f*f) continue;
+        //simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*10.f;
+        //simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*10.f;
+        //simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 500.0f;
+    //}
     for(int y = 0; y<N; ++y)
     {
-        simulation.sourceVelocityX[1+y*N] = 400.0f;
-        simulation.sourceVelocityY[1+y*N] = 0.0f;
-        simulation.sourceDensity[1+y*N] = (y/5)%2 ? 1700.0f : 0.0f;
+        if ((y/12)%2)
+        {
+            simulation.sourceVelocityX[1+y*N] = 400.0f;
+            simulation.sourceVelocityY[1+y*N] = 0.0f;
+            simulation.sourceDensity[1+y*N] = 2*1700.0f;
+        }
     }
-
     simulation.dt = 0.05f;
     simulation.viscosity = 1.0f;
     simulation.diffusion = 1.0f;
     simulation.evolve();
 
-    // update denstity
-    for(int i = 0; i<N*N; ++i)
-    {
-        double dx = simulation.velocityX[i];
-        double dy = simulation.velocityY[i];
-        double d = simulation.density[i];
-        //intensity[i] = 10.0f*(dx*dx+dy*dy);
-        intensity[i] = max(0.0,min(d*0.25,255.0));
-    }
 
     updateTexture();
+}
 
-    glUseProgram(program->data());
+void FluidApplication::step()
+{
+    simulate();
 
-    // Bind the texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glUniform1i(glGetUniformLocation(program->data(),"intensity"),0);
+    // the density
+    {
+        glUseProgram(program->data());
 
-    // Bind the VBO
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // Bind the texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture_id);
+        glUniform1i(glGetUniformLocation(program->data(),"intensity"),0);
 
-    // Load the vertex data
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); 
-    glEnableVertexAttribArray(0);
-    glDrawArrays(GL_TRIANGLES, 0, 3*2); 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // Bind the VBO
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
+        // Load the vertex data
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); 
+        glEnableVertexAttribArray(0);
+        glDrawArrays(GL_TRIANGLES, 0, 3*2); 
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
 
+    // the wall
+    {
+        glUseProgram(programWall->data());
 
+        // Bind the texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture_id_wall);
+        glUniform1i(glGetUniformLocation(programWall->data(),"intensity"),0);
+
+        // Bind the VBO
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+        // Load the vertex data
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); 
+        glEnableVertexAttribArray(0);
+        glDrawArrays(GL_TRIANGLES, 0, 3*2); 
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
 }
 
 void FluidApplication::buildTexture()
@@ -189,10 +192,44 @@ void FluidApplication::buildTexture()
     glBindTexture(GL_TEXTURE_2D,0);
 }
 
+void FluidApplication::buildTextureWall()
+{
+    glGenTextures(1,&texture_id_wall);
+    glBindTexture(GL_TEXTURE_2D,texture_id_wall);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D,0);
+}
+
 void FluidApplication::updateTexture()
 {
+    // update intensity
+    for(int i = 0; i<N*N; ++i)
+    {
+        double dx = simulation.velocityX[i];
+        double dy = simulation.velocityY[i];
+        double d = simulation.density[i];
+        intensity[i] = max(0.0,min(d*0.25,255.0));
+    }
     // send the texture to openGL
     glBindTexture(GL_TEXTURE_2D,texture_id);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, N, N ,GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
+    glBindTexture(GL_TEXTURE_2D,0);
+}
+
+void FluidApplication::updateTextureWall()
+{
+    // update denstity
+    for(int i = 0; i<N*N; ++i)
+    {
+        intensity[i] = 255 * simulation.boundary[i];
+    }
+
+    // send the texture to openGL
+    glBindTexture(GL_TEXTURE_2D,texture_id_wall);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, N, N ,GL_LUMINANCE, GL_UNSIGNED_BYTE, (const GLvoid*)intensity.data());
     glBindTexture(GL_TEXTURE_2D,0);
 }

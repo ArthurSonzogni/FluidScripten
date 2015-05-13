@@ -8,7 +8,9 @@ template<int N>
 class Simulation
 {
     public:
+        Simulation();
         typedef std::vector<float> D;
+        typedef std::vector<bool> B;
         // the data
         D density   = D(N*N,0.f);
         D velocityX = D(N*N,0.f);
@@ -17,6 +19,8 @@ class Simulation
         D sourceDensity      = D(N*N,0.f);
         D sourceVelocityX    = D(N*N,0.f);
         D sourceVelocityY    = D(N*N,0.f);
+        // the boundary
+        B boundary  = B(N*N,true);
         // the parameters
         float dt = 1.0f;
         float diffusion = 0.01f;
@@ -26,6 +30,7 @@ class Simulation
     private:
         void evolve_density();
         void evolve_velocity();
+        void multiply_with_boundary(D& data);
         // internal data
         D buffer_1 = D(N*N,0.0f);
         D buffer_2 = D(N*N,0.0f);
@@ -36,7 +41,7 @@ class Simulation
         static void diffuse(const D& input, D& output, float dt);
         static void advect(const D& input, D& output, const D& dx, const D& dy, float dt);
         static void add_source(const D& source, D& output, float dt);
-        static void project(D& dx, D& dy, D& pressure, D& divergence);
+               void project(D& dx, D& dy, D& pressure, D& divergence);
 
 };
 

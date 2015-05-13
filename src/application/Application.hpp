@@ -15,6 +15,7 @@ class Application
     private: // data
         SDL_Window* window = nullptr;
         SDL_GLContext context = nullptr;
+    protected: // data
         int width = 0;
         int height = 0;
 };
