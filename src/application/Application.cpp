@@ -25,8 +25,8 @@ void Application::exec()
         cerr << SDL_GetError() << endl;
         throw 0;
     }
-    width = 800;
-    height = 600;
+    width = 512;
+    height = 512;
     loadOpenGLContext();
 
     this->init();

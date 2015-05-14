@@ -15,12 +15,6 @@ class Simulation
         D density   = D(N*N,0.f);
         D velocityX = D(N*N,0.f);
         D velocityY = D(N*N,0.f);
-        // the source
-        D sourceDensity      = D(N*N,0.f);
-        D sourceVelocityX    = D(N*N,0.f);
-        D sourceVelocityY    = D(N*N,0.f);
-        // the boundary
-        B boundary  = B(N*N,true);
         // the parameters
         float dt = 1.0f;
         float diffusion = 0.01f;
@@ -30,7 +24,6 @@ class Simulation
     private:
         void evolve_density();
         void evolve_velocity();
-        void multiply_with_boundary(D& data);
         // internal data
         D buffer_1 = D(N*N,0.0f);
         D buffer_2 = D(N*N,0.0f);
