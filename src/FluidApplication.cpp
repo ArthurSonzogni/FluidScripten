@@ -32,9 +32,9 @@ void main()
     float dn = texture2D(intensity,fPos+vec2(0.0,0.01)).r;
     float d = texture2D(intensity,fPos).r;
     float dp = texture2D(intensity,fPos-vec2(0.0,0.01)).r;
-    float D = 0.5+2.0*(dp-dn);
-    const vec4 startColor = vec4(  0.0,   0.0,   255.0, 255.0) / 255.0;
-    const vec4 endColor   = vec4(255.0, 255.0, 255.0, 255.0) / 255.0;
+    float D = 0.7+2.0*(dp-dn);
+    const vec4 startColor = vec4(1.0, 1.0, 1.0, 1.0);
+    const vec4 endColor   = vec4(1.0, 0.0, 0.0, 1.0);
     gl_FragColor = D*mix(startColor,endColor,d*8.0);
     gl_FragColor.a = 1.0;
 }
@@ -70,11 +70,17 @@ void FluidApplication::init()
     // fix opengl state
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // simulation setup
+    simulation.dt = 1.0f;
+    simulation.viscosity = 0.01f;
+    simulation.diffusion = 0.01f;
 }
 
 
 void FluidApplication::simulate()
 {
+    // handle mouse events
     int mouse_x = 0;
     int mouse_y = 0;
     static bool mouse_pressed_previous = false;
@@ -82,13 +88,11 @@ void FluidApplication::simulate()
     static int mouse_y_previous = 0;
     int state = SDL_GetMouseState(&mouse_x,&mouse_y);
     bool mouse_left  = state & 1;
-    bool mouse_middle  = state & 2;
     bool mouse_right = state & 4;
-    bool put_matter = mouse_left || mouse_middle;
-    bool put_acceleration = mouse_left || mouse_right;
+    bool put_matter = mouse_left;
+    bool put_acceleration = mouse_right != mouse_left;
     if (mouse_left || mouse_right)
     {
-        cout << "state = " << state << endl;
         mouse_x = mouse_x * N / width;
         mouse_y = N-1-mouse_y * N / height;
         if (mouse_pressed_previous)
@@ -131,31 +135,7 @@ void FluidApplication::simulate()
     }
 
     // simulate 1 step
-    static int i = 0;
-    ++i;
-    const int f = 6.0f;
-    //for(int dx = -f; dx<f; ++dx)
-    //for(int dy = -f; dy<f; ++dy)
-    //{
-        //if (dx*dx+dy*dy>f*f) continue;
-        //simulation.sourceVelocityX[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*cos((i/50)*M_PI/4)*10.f;
-        //simulation.sourceVelocityY[N/2 +dx + N * dy+ N*N/2] = (f*f-dx*dx+dy*dy)*sin((i/50)*M_PI/4)*10.f;
-        //simulation.sourceDensity[N/2 +dx + N * dy+ N*N/2] = 500.0f;
-    //}
-    //for(int y = 0; y<N; ++y)
-    //{
-        //if ((y/12)%2)
-        //{
-            //simulation.sourceVelocityX[1+y*N] = 1.0f;
-            //simulation.sourceVelocityY[1+y*N] = 0.0f;
-            //simulation.sourceDensity[1+y*N] = 100.f;
-        //}
-    //}
-    simulation.dt = 1.0f;
-    simulation.viscosity = 0.01f;
-    simulation.diffusion = 0.01f;
     simulation.evolve();
-
 
     updateTexture();
 }
