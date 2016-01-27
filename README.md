@@ -1,6 +1,6 @@
-Fluid Emscripten
-================
+[![Fluid Emscripten](thumnail.png)](http://ArthurSonzogni@github.io/FluidScripten/index.html)
+========
 
-[![Fluid Emscripten](image link)](web link)
+A fluid simulateur in C++ compiled in javascript with emscripten.
 
-A fluid simulateur in C++ compiled in javascript with emscripten
+[ **Play Demo** ](http://ArthurSonzogni@github.io/FluidScripten/index.html)
